@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Мой поиск</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔎</text></svg>">
+<style>
+  :root {
+    --bg: #f5f6fa;
+    --card: #ffffff;
+    --accent: #3766e8;
+    --text: #1a1a1a;
+    --muted: #7a7a7a;
+    --border: #e3e4ea;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg);
+    font-family: -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+    color: var(--text);
+  }
+  .wrap {
+    width: 100%;
+    max-width: 560px;
+    padding: 32px 20px;
+  }
+  h1 {
+    text-align: center;
+    font-size: 22px;
+    margin-bottom: 4px;
+  }
+  p.sub {
+    text-align: center;
+    color: var(--muted);
+    font-size: 14px;
+    margin-top: 0;
+    margin-bottom: 28px;
+  }
+  .searchbox {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 28px;
+  }
+  .searchbox input {
+    flex: 1;
+    padding: 12px 16px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    font-size: 15px;
+    outline: none;
+  }
+  .searchbox input:focus {
+    border-color: var(--accent);
+  }
+  .searchbox button {
+    padding: 0 18px;
+    border-radius: 10px;
+    border: none;
+    background: var(--accent);
+    color: #fff;
+    font-size: 14px;
+    cursor: pointer;
+  }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 12px;
+  }
+  .card {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 14px;
+    border-radius: 12px;
+    border: 2px solid var(--border);
+    background: var(--card);
+    cursor: pointer;
+    transition: border-color .15s ease, transform .1s ease;
+    text-decoration: none;
+    color: var(--text);
+  }
+  .card:hover { transform: translateY(-1px); border-color: #c7cdea; }
+  .card.active { border-color: var(--accent); background: #eef2ff; }
+  .card img { width: 22px; height: 22px; border-radius: 4px; flex-shrink: 0; }
+  .card .name { font-size: 14px; font-weight: 500; }
+  .card .default-tag {
+    margin-left: auto;
+    font-size: 10px;
+    color: var(--accent);
+    font-weight: 700;
+  }
+  .redirect-overlay {
+    position: fixed;
+    inset: 0;
+    background: var(--bg);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 22px;
+    z-index: 10;
+  }
+  .redirect-overlay .status {
+    color: var(--muted);
+    font-size: 14px;
+  }
+  .redirect-overlay .status b { color: var(--text); }
+  .redirect-overlay .icons {
+    display: flex;
+    gap: 10px;
+  }
+  .redirect-overlay .icons a {
+    width: 46px;
+    height: 46px;
+    border-radius: 12px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-decoration: none;
+    transition: transform .1s ease, border-color .15s ease;
+  }
+  .redirect-overlay .icons a:hover { transform: translateY(-2px); border-color: var(--accent); }
+  .redirect-overlay .icons img { width: 22px; height: 22px; border-radius: 4px; }
+  .redirect-overlay .cancel {
+    font-size: 12px;
+    color: var(--muted);
+    text-decoration: underline;
+    cursor: pointer;
+    background: none;
+    border: none;
+  }
+  footer {
+    text-align: center;
+    margin-top: 26px;
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+
+<!-- Экран, который на долю секунды показывается, когда пришёл запрос из адресной строки -->
+<div id="redirectOverlay" class="redirect-overlay hidden">
+  <div class="status">Переход в <b id="targetEngineName">...</b> по запросу «<span id="targetQuery"></span>»</div>
+  <div class="icons" id="quickIcons"></div>
+  <button class="cancel" id="cancelBtn">Остаться на этой странице</button>
+</div>
+
+<!-- Обычная страница-хаб: выбор поисковика по умолчанию + свой поиск -->
+<div class="wrap" id="mainView">
+  <h1>Мой поиск</h1>
+  <p class="sub">Выберите поисковик по умолчанию. Он будет открываться автоматически при поиске из адресной строки браузера.</p>
+
+  <form class="searchbox" id="searchForm">
+    <input type="text" id="searchInput" placeholder="Найти что-нибудь…" autofocus>
+    <button type="submit">Найти</button>
+  </form>
+
+  <div class="grid" id="enginesGrid"></div>
+
+  <footer>Ваш выбор сохраняется в этом браузере автоматически.</footer>
+</div>
+
+<script>
+(function () {
+  var ENGINES = [
+    { id: 'yandex',     name: 'Яндекс',     icon: 'https://yandex.ru/favicon.ico',      url: 'https://yandex.ru/search/?text=' },
+    { id: 'google',     name: 'Google',     icon: 'https://www.google.com/favicon.ico', url: 'https://www.google.com/search?q=' },
+    { id: 'bing',       name: 'Bing',       icon: 'https://www.bing.com/favicon.ico',    url: 'https://www.bing.com/search?q=' },
+    { id: 'yahoo',      name: 'Yahoo',      icon: 'https://www.yahoo.com/favicon.ico',   url: 'https://search.yahoo.com/search?p=' },
+    { id: 'duckduckgo', name: 'DuckDuckGo', icon: 'https://duckduckgo.com/favicon.ico',  url: 'https://duckduckgo.com/?q=' },
+    { id: 'mailru',     name: 'Mail.ru',    icon: 'https://go.mail.ru/favicon.ico',      url: 'https://go.mail.ru/search?q=' }
+  ];
+
+  var STORAGE_KEY = 'preferredSearchEngine';
+  var REDIRECT_DELAY_MS = 450; // сколько ждать перед авто-переходом
+
+  function getDefaultEngine() {
+    var id = localStorage.getItem(STORAGE_KEY);
+    var found = ENGINES.filter(function (e) { return e.id === id; })[0];
+    return found || ENGINES[0];
+  }
+
+  function setDefaultEngine(engine) {
+    localStorage.setItem(STORAGE_KEY, engine.id);
+  }
+
+  function goTo(engine, query) {
+    window.location.replace(engine.url + encodeURIComponent(query));
+  }
+
+  function getQueryParam() {
+    var params = new URLSearchParams(window.location.search);
+    // поддерживаем несколько вариантов имени параметра на всякий случай
+    return params.get('q') || params.get('text') || params.get('query') || '';
+  }
+
+  function renderMainGrid() {
+    var grid = document.getElementById('enginesGrid');
+    var current = getDefaultEngine();
+    grid.innerHTML = '';
+    ENGINES.forEach(function (engine) {
+      var card = document.createElement('div');
+      card.className = 'card' + (engine.id === current.id ? ' active' : '');
+
+      var img = document.createElement('img');
+      img.src = engine.icon;
+      img.alt = engine.name;
+      img.referrerPolicy = 'no-referrer';
+
+      var name = document.createElement('span');
+      name.className = 'name';
+      name.textContent = engine.name;
+
+      card.appendChild(img);
+      card.appendChild(name);
+
+      if (engine.id === current.id) {
+        var tag = document.createElement('span');
+        tag.className = 'default-tag';
+        tag.textContent = 'ПО УМОЛЧАНИЮ';
+        card.appendChild(tag);
+      }
+
+      card.addEventListener('click', function () {
+        setDefaultEngine(engine);
+        renderMainGrid();
+      });
+
+      grid.appendChild(card);
+    });
+  }
+
+  function initMainView() {
+    document.getElementById('mainView').classList.remove('hidden');
+    renderMainGrid();
+
+    document.getElementById('searchForm').addEventListener('submit', function (e) {
+      e.preventDefault();
+      var q = document.getElementById('searchInput').value.trim();
+      if (!q) return;
+      goTo(getDefaultEngine(), q);
+    });
+  }
+
+  function initRedirectView(query) {
+    var overlay = document.getElementById('redirectOverlay');
+    overlay.classList.remove('hidden');
+
+    var engine = getDefaultEngine();
+    document.getElementById('targetEngineName').textContent = engine.name;
+    document.getElementById('targetQuery').textContent = query;
+
+    var iconsBox = document.getElementById('quickIcons');
+    iconsBox.innerHTML = '';
+    ENGINES.forEach(function (e) {
+      var a = document.createElement('a');
+      a.href = e.url + encodeURIComponent(query);
+      a.title = 'Искать в ' + e.name;
+      var img = document.createElement('img');
+      img.src = e.icon;
+      img.alt = e.name;
+      img.referrerPolicy = 'no-referrer';
+      a.appendChild(img);
+      a.addEventListener('click', function (ev) {
+        ev.preventDefault();
+        clearTimeout(timer);
+        setDefaultEngine(e); // клик по другому поисковику делает его новым выбором по умолчанию
+        goTo(e, query);
+      });
+      iconsBox.appendChild(a);
+    });
+
+    var timer = setTimeout(function () {
+      goTo(engine, query);
+    }, REDIRECT_DELAY_MS);
+
+    document.getElementById('cancelBtn').addEventListener('click', function () {
+      clearTimeout(timer);
+      overlay.classList.add('hidden');
+      initMainView();
+    });
+  }
+
+  var query = getQueryParam();
+  if (query) {
+    initRedirectView(query);
+  } else {
+    initMainView();
+  }
+})();
+</script>
+</body>
+</html>
