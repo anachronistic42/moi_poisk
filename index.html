@@ -69,13 +69,14 @@
   }
   .grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
     gap: 12px;
   }
   .card {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
-    gap: 10px;
+    row-gap: 6px;
     padding: 14px;
     border-radius: 12px;
     border: 2px solid var(--border);
@@ -84,16 +85,26 @@
     transition: border-color .15s ease, transform .1s ease;
     text-decoration: none;
     color: var(--text);
+    overflow: hidden;
   }
   .card:hover { transform: translateY(-1px); border-color: #c7cdea; }
   .card.active { border-color: var(--accent); background: #eef2ff; }
+  .card .main-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+  }
   .card img { width: 22px; height: 22px; border-radius: 4px; flex-shrink: 0; }
   .card .name { font-size: 14px; font-weight: 500; }
   .card .default-tag {
-    margin-left: auto;
+    flex-basis: 100%;
+    text-align: left;
     font-size: 10px;
+    letter-spacing: .02em;
     color: var(--accent);
     font-weight: 700;
+    white-space: nowrap;
   }
   .redirect-overlay {
     position: fixed;
@@ -212,6 +223,9 @@
       var card = document.createElement('div');
       card.className = 'card' + (engine.id === current.id ? ' active' : '');
 
+      var mainRow = document.createElement('div');
+      mainRow.className = 'main-row';
+
       var img = document.createElement('img');
       img.src = engine.icon;
       img.alt = engine.name;
@@ -221,8 +235,9 @@
       name.className = 'name';
       name.textContent = engine.name;
 
-      card.appendChild(img);
-      card.appendChild(name);
+      mainRow.appendChild(img);
+      mainRow.appendChild(name);
+      card.appendChild(mainRow);
 
       if (engine.id === current.id) {
         var tag = document.createElement('span');
